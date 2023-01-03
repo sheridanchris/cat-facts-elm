@@ -9,8 +9,7 @@ import Json.Decode exposing (Decoder, at, field, list, map, string)
 
 
 type alias CatFact =
-    { fact : String
-    }
+    { fact : String }
 
 
 type alias Model =
@@ -81,8 +80,12 @@ errorToBody error =
 
 view : Model -> Html Msg
 view model =
+    let
+        facts =
+            model.facts |> Maybe.withDefault [ "Nothing to see here" ] |> List.map viewCatFact
+    in
     div []
-        ((model.facts |> Maybe.withDefault [ "Nothing to see here" ] |> List.map viewCatFact)
+        (facts
             ++ [ p [] [ text ("Error: " ++ (model.error |> Maybe.map errorToBody |> Maybe.withDefault "No Error")) ]
                , input [ placeholder "# of cat facts", type_ "number", onInput InputChanged, value (String.fromInt model.numberOfFacts) ] []
                , button [ onClick RequestCatFact ] [ text "Get a random cat fact" ]
