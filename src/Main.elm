@@ -20,7 +20,7 @@ type alias Model =
 
 
 type Msg
-    = RequestCatFact
+    = RequestCatFacts
     | GotCatFact (Result Http.Error (List CatFact))
     | InputChanged String
 
@@ -32,26 +32,25 @@ init () =
 
 catFactDecoder : Decoder (List CatFact)
 catFactDecoder =
-    -- let data = field "data" list
     at [ "data" ] (list (map CatFact (field "fact" string)))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        RequestCatFact ->
+        RequestCatFacts ->
             ( model, Http.get { url = "https://catfact.ninja/facts?limit=" ++ String.fromInt model.numberOfFacts, expect = Http.expectJson GotCatFact catFactDecoder } )
 
         GotCatFact result ->
             case result of
                 Ok catFacts ->
-                    ( { model | facts = Just (catFacts |> List.map (\data -> data.fact)) }, Cmd.none )
+                    ( { model | facts = catFacts |> List.map .fact |> Just }, Cmd.none )
 
                 Err err ->
                     ( { model | facts = Nothing, error = Just err }, Cmd.none )
 
         InputChanged input ->
-            ( { model | numberOfFacts = Maybe.withDefault 0 (String.toInt input) }, Cmd.none )
+            ( { model | numberOfFacts = String.toInt input |> Maybe.withDefault 0 }, Cmd.none )
 
 
 viewCatFact : String -> Html Msg
@@ -59,23 +58,27 @@ viewCatFact fact =
     p [] [ text fact ]
 
 
-errorToBody : Http.Error -> String
-errorToBody error =
-    case error of
-        BadUrl badUrl ->
-            "Bad url: " ++ badUrl
+errorToString : Http.Error -> String
+errorToString error =
+    let
+        errorDescription =
+            case error of
+                BadUrl _ ->
+                    "Bad url"
 
-        Timeout ->
-            "Timeout"
+                Timeout ->
+                    "Timeout"
 
-        NetworkError ->
-            "Network Error"
+                NetworkError ->
+                    "Network Error"
 
-        BadStatus badStatus ->
-            "Bad status: " ++ String.fromInt badStatus
+                BadStatus _ ->
+                    "Bad Status"
 
-        BadBody badBody ->
-            "Bad body: " ++ badBody
+                BadBody _ ->
+                    "Bad Body"
+    in
+    "An error has occured: " ++ errorDescription
 
 
 view : Model -> Html Msg
@@ -83,16 +86,20 @@ view model =
     let
         facts =
             model.facts |> Maybe.withDefault [ "Nothing to see here" ] |> List.map viewCatFact
+
+        error =
+            model.error |> Maybe.map errorToString |> Maybe.withDefault "No errors"
     in
     div []
         (facts
-            ++ [ p [] [ text ("Error: " ++ (model.error |> Maybe.map errorToBody |> Maybe.withDefault "No Error")) ]
+            ++ [ p [] [ text error ]
                , input [ placeholder "# of cat facts", type_ "number", onInput InputChanged, value (String.fromInt model.numberOfFacts) ] []
-               , button [ onClick RequestCatFact ] [ text "Get a random cat fact" ]
+               , button [ onClick RequestCatFacts ] [ text "Get random cat facts" ]
                ]
         )
 
 
+main : Program () Model Msg
 main =
     Browser.element
         { init = init
